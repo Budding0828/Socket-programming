@@ -1,0 +1,68 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netinet/tcp.h>
+
+#define PORT 8887
+#define MAXBUFFER 200
+/*客户端代码*/
+
+int main(){
+    printf("**客户端**\n");
+    //创建套接字
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    //向服务器（特定的IP和端口）发起请求
+    struct sockaddr_in serv_addr;
+    memset(&serv_addr, 0, sizeof(serv_addr));  //每个字节都用0填充
+    serv_addr.sin_family = AF_INET;  //使用IPv4地址
+    serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");  //具体的IP地址
+    serv_addr.sin_port = htons(PORT);  //端口
+
+    //连接
+    int status = connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
+    if(status == -1)
+    {
+        printf("建立连接失败\n");
+        exit(1);
+    }
+    printf("成功连接客户端\n");
+
+    //读取服务器传回的数据
+    char buffer[MAXBUFFER];
+
+    //检测连接状态
+    struct tcp_info info;
+    int len = sizeof(info);
+
+    //info.tcpi_state == 1 表示连接成功
+    //info.tcpi_state == 8 表示连接断开
+
+    while(1)
+    {
+        getsockopt(sock, IPPROTO_TCP, TCP_INFO, &info, (socklen_t*)&len);
+        if(info.tcpi_state != TCP_ESTABLISHED)
+        {
+            printf("服务器已经断开...\n");
+            break;
+        }
+
+        //printf("here\n");
+        read(sock, buffer, sizeof(buffer));
+        //if(buffer[0]=='\n') continue;
+        printf("来自服务器的内容： %s\n", buffer);
+
+    }
+
+
+    //关闭套接字
+    close(sock);
+
+    return 0;
+}
+
+
+

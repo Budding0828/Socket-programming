@@ -1,0 +1,71 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+#define PORT 8887   //端口号
+#define BACKLOG 10  //设置等待连接数目
+#define MAXBUFFER 200
+
+int main(){
+
+    printf("**服务端**\n");
+    //创建套接字
+    //设置通信类型为AF_INET
+    //套接字类型采用流格式
+    int serv_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+    //为套接字“安排”一个地方
+    struct sockaddr_in serv_addr;
+    //初始化sockaddr_in 数据
+    memset(&serv_addr, 0, sizeof(serv_addr));  //每个字节都用0填充
+    serv_addr.sin_family = AF_INET;  //使用IPv4地址
+    serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");  //具体的IP地址
+    serv_addr.sin_port = htons(PORT);  //端口
+
+    int on = 1; //on==1允许地址重用， 0禁止地址重用
+    int s = setsockopt(serv_sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(int));
+    if(s < 0)
+    {
+        perror("setsockopt 错误\n");
+        exit(1);
+    }
+
+    //将套接字和IP、端口绑定
+    bind(serv_sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
+
+    //进入监听状态，等待用户发起请求
+    listen(serv_sock, BACKLOG);
+
+    //接收客户端请求
+    struct sockaddr_in clnt_addr;
+    socklen_t clnt_addr_size = sizeof(clnt_addr);
+    int clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
+    if(clnt_sock == -1)
+    {
+        printf("建立连接失败\n");
+        exit(1);
+    }
+    printf("成功连接服务端\n");
+
+    //向客户端发送数据
+    char mesg[MAXBUFFER];
+
+    while(1)
+    {
+        printf("请输入传输内容：\n");
+        //scanf("%s", mesg);
+        fgets(mesg, MAXBUFFER, stdin);
+        write(clnt_sock, mesg, sizeof(mesg));
+    }
+
+
+    //关闭套接字
+    close(clnt_sock);
+    close(serv_sock);
+
+    return 0;
+}

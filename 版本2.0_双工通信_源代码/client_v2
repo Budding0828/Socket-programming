@@ -1,0 +1,103 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+
+#define PORT 8887
+#define MAXBUFFER 200
+/*客户端代码*/
+
+int main(){
+    printf("**客户端**\n");
+
+    fd_set rfds;
+    struct timeval tv;
+    int retval, maxfd;
+
+    //创建套接字
+    int serv_sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    //向服务器（特定的IP和端口）发起请求
+    struct sockaddr_in serv_addr;
+    memset(&serv_addr, 0, sizeof(serv_addr));  //每个字节都用0填充
+    serv_addr.sin_family = AF_INET;  //使用IPv4地址
+    serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");  //具体的IP地址
+    serv_addr.sin_port = htons(PORT);  //端口
+
+    //连接
+    int status = connect(serv_sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
+    //printf("serv_sock = %d", serv_sock);
+    if(status == -1)
+    {
+        printf("建立连接失败\n");
+        exit(1);
+    }
+    printf("成功连接客户端\n");
+
+    //读取服务器传回的数据
+    char msg[MAXBUFFER];
+    while(1)
+    {
+
+        //把可读文件描述符的集合清空
+        FD_ZERO(&rfds);
+        //把标准输入的文件描述符加入到集合中
+        FD_SET(0, &rfds);
+        maxfd = 0;
+        FD_SET(serv_sock, &rfds);
+        if(maxfd < serv_sock)    maxfd = serv_sock;
+
+        //设置超时时间
+        tv.tv_sec = 2;
+        tv.tv_usec = 0;
+
+        retval = select(maxfd+1, &rfds, NULL, NULL, &tv);
+        if(retval==-1)
+        {
+            perror("客户端select出错\n");
+            exit(1);
+        }
+        else if(retval==0)
+        {
+            //printf("waiting...\n");
+            continue;
+        }
+        else
+        {
+            //接受信息
+            if(FD_ISSET(serv_sock, &rfds))
+            {
+                memset(&msg, 0, sizeof(msg));
+                read(serv_sock, msg, sizeof(msg));
+                if(strlen(msg)==0)
+                {
+                    printf("服务器宕机，结束聊天\n");
+                    break;
+                }
+                printf("来自服务器的内容： %s\n", msg);
+            }
+            else
+            {
+                memset(&msg, 0, sizeof(msg));
+                //scanf("%s", msg);
+                fgets(msg, MAXBUFFER, stdin);
+                write(serv_sock, msg, sizeof(msg));
+            }
+        }
+
+        //read(serv_sock, msg, sizeof(msg));
+        //if(msg[0]=='\n') continue;
+        //printf("来自服务器的内容： %s\n", msg);
+    }
+
+
+    //关闭套接字
+    close(serv_sock);
+
+    return 0;
+}
+
+
+
